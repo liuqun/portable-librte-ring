@@ -1,0 +1,17 @@
+# 忽略vim/gedit/Word等文本编辑器的临时文件
+*.swp
+*.tmp
+*.bak
+~*
+*~
+.DS_Store
+
+# 忽略 QtCreator 临时文件
+*.pro.user*
+*.autosave
+build-*-Debug
+build-*-Release
+build-*-Profile
+
+# 忽略 Visual Studio Code 生成的临时目录
+.code
