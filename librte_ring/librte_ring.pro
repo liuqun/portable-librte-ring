@@ -19,7 +19,8 @@ SOURCES += \
         rte_ring.c
 
 HEADERS += \
-        rte_ring.h
+        rte_ring.h \
+        utils/typeutils.h
 
 unix {
     QMAKE_CFLAGS += -pthread
