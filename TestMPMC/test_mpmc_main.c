@@ -40,27 +40,38 @@
 #include "rte_ring.h"
 
 
-#define QSIZ        8192
-#define NITER       8192
+#define QSIZ        8*1024*1024
+#define NITER       8*1024*1024
 
 
-typedef struct rte_ring pcq;
+//typedef struct rte_ring pcq;
 
 // Latency tuple recorded by the consumer thread(s).
+// 性能测试(测试4和测试3)中记录消费者线程延迟长度时间戳的结构体
 struct lat
 {
-    uint64_t v;     // measured latency
+    uint64_t v;     // measured latency ====> 此成员变量 v 用于度量延迟长度（以uint64_t类型的系统时钟计数器为单位）
     uint64_t ts;    // timestamp
 };
-typedef struct lat lat;
 
+// Array of latency structs（自定义数组类型1：以struct lat结构体为数组节点）
+// 语法宏 VECT_TYPEDEF(latv, struct lat); 完全展开后的结构体如下:
+struct latv {
+    struct lat * array;
+    size_t size;
+    size_t capacity;
+};
+//typedef struct latv latv;
 
-// Array of latency structs
-VECT_TYPEDEF(latv, lat);
-
-// Vect of u64
-VECT_TYPEDEF(u64v, uint64_t);
-
+// Vect of u64（自定义数组类型2：以64位int整数为数组节点）
+// 语法宏 VECT_TYPEDEF(u64v, uint64_t); 完全展开后的结构体如下:
+// VECT_TYPEDEF(u64v, uint64_t);
+typedef struct u64v {
+    uint64_t * array;
+    size_t size;
+    size_t capacity;
+};
+//typedef struct u64v u64v;
 
 sem_t                Ending;    // Used to signal thread completion
 
@@ -76,7 +87,7 @@ atomic_uint_fast32_t Start __CACHELINE_ALIGNED;     // Used to tell all threads 
 struct ctx
 {
     // Cached copy of the shared queue & global vars
-    pcq *q;
+    struct rte_ring *q;
 
     atomic_uint_fast32_t *done;
     atomic_uint_fast32_t *start;
@@ -84,12 +95,12 @@ struct ctx
     atomic_uint_fast32_t *seq;  // shared sequence number across all producers
 
     // Next two fields are used by the verifiers
-    u64v pseq;                  // per-CPU sequence as recorded by producer
+    struct u64v  pseq; // per-CPU sequence as recorded by producer
 
     // Per CPU Var
     size_t nelem;   // number of elems pushed
     int  cpu;       // cpu# on which this thread runs
-    latv lv;        // latency array (used by consumer only)
+    struct latv  lv;// latency array (used by consumer only)
 
     // total CPU cycles for the ENQ or DEQ operation
     // cycles / nelem  will give us time in CPU cycles per ENQ or
@@ -113,7 +124,7 @@ struct test_desc
     void * (*prod)(void *);
     void * (*cons)(void *);
 
-    void   (*fini)(pcq*, ctx** pp, int np, ctx** cc, int nc);
+    void   (*fini)(struct rte_ring *, ctx** pp, int np, ctx** cc, int nc);
 
     const char* name;
 };
@@ -122,7 +133,7 @@ typedef struct test_desc test_desc;
 
 // Create a new context
 static ctx*
-newctx(pcq* q, size_t vsz, size_t ssz)
+newctx(struct rte_ring *q, size_t vsz, size_t ssz)
 {
     ctx* c = NEWZ(ctx);
     assert(c);
@@ -153,10 +164,10 @@ delctx(ctx* c)
 }
 
 
-static pcq *
+static struct rte_ring *
 mt_setup()
 {
-    pcq *q = rte_ring_create(QSIZ, 0);
+    struct rte_ring *q = rte_ring_create(QSIZ, 0);
 
     atomic_init(&Done,   0);
     atomic_init(&Seq,    0);
@@ -173,7 +184,7 @@ mt_setup()
 }
 
 static void
-mt_fini(pcq* q)
+mt_fini(struct rte_ring *q)
 {
     rte_ring_destroy(q);
     sem_destroy(&Ending);
@@ -216,7 +227,7 @@ static void*
 perf_producer(void* v)
 {
     ctx* c = v;
-    pcq* q = c->q;
+    struct rte_ring* q = c->q;
     int i = 0;
 
 
@@ -245,8 +256,8 @@ static void*
 perf_consumer(void *vx)
 {
     ctx* c  = vx;
-    pcq* q  = c->q;
-    latv* v = &c->lv;
+    struct rte_ring* q  = c->q;
+    struct latv* v = &c->lv;
     void *vp = 0;
 
     // Wait to be kicked off
@@ -266,7 +277,7 @@ perf_consumer(void *vx)
         c->nelem++;
         uint64_t j = (uint64_t)vp;
         uint64_t nn = timenow();
-        lat      ll = { .v = nn - j, .ts = nn };
+        struct lat ll = { .v = nn - j, .ts = nn };
         VECT_PUSH_BACK(v, ll);
     } while (1);
 
@@ -279,8 +290,8 @@ perf_consumer(void *vx)
 static int
 ts_cmp(const void* a, const void* b)
 {
-    const lat* x = a;
-    const lat* y = b;
+    const struct lat  *x = a;
+    const struct lat  *y = b;
 
     if (x->ts < y->ts)
         return -1;
@@ -296,8 +307,8 @@ ts_cmp(const void* a, const void* b)
 static int
 lat_cmp(const void* a, const void* b)
 {
-    const lat* x = a;
-    const lat* y = b;
+    const struct lat  *x = a;
+    const struct lat  *y = b;
 
     if (x->v < y->v)
         return -1;
@@ -313,7 +324,7 @@ lat_cmp(const void* a, const void* b)
 // This is called after all the producer and consumer threads have
 // completed their tasks
 static void
-perf_finisher(pcq *q, ctx** pp, int np, ctx** cc, int nc)
+perf_finisher(struct rte_ring *q, ctx** pp, int np, ctx** cc, int nc)
 {
     int i;
     size_t tot   = 0;
@@ -337,8 +348,8 @@ perf_finisher(pcq *q, ctx** pp, int np, ctx** cc, int nc)
     }
     printf("# P Total %zd elem, avg %5.2f cy/enq\n", tot, _d(cyc) / _d(tot));
 
-    latv all;
-    latv pctile;
+    struct latv  all;
+    struct latv  pctile;
 
     VECT_INIT(&all, tot);
     VECT_INIT(&pctile, tot);
@@ -391,11 +402,6 @@ perf_finisher(pcq *q, ctx** pp, int np, ctx** cc, int nc)
            VECT_ELEM(&pctile, p70).v,
            VECT_ELEM(&pctile, p50).v);
 
-    lat* v;
-    VECT_FOR_EACH(&all, v) {
-        printf("%" PRIu64 "\n", v->v);
-    }
-
     VECT_FINI(&all);
 }
 
@@ -409,7 +415,7 @@ static void*
 vrfy_producer(void* v)
 {
     ctx* c   = v;
-    pcq* q   = c->q;
+    struct rte_ring* q   = c->q;
     int i    = 0;
     uint_fast32_t n = atomic_fetch_add(c->seq, 1);
     uint64_t z;
@@ -441,8 +447,8 @@ static void*
 vrfy_consumer(void *vx)
 {
     ctx* c  = vx;
-    pcq* q  = c->q;
-    latv* v = &c->lv;
+    struct rte_ring *q = c->q;
+    struct latv  *v = &(c->lv);
     void *vp;
 
     // Wait to be kicked off
@@ -456,7 +462,7 @@ vrfy_consumer(void *vx)
             continue;
         }
 
-        lat ll = { .v = (uint64_t)vp, .ts = 0 };
+        struct lat ll = { .v = (uint64_t)vp, .ts = 0 };
         VECT_PUSH_BACK(v, ll);
     }
 
@@ -468,8 +474,8 @@ vrfy_consumer(void *vx)
 static int
 seq_cmp(const void* a, const void* b)
 {
-    const lat* x = a;
-    const lat* y = b;
+    const struct lat  *x = a;
+    const struct lat  *y = b;
 
     if (x->v < y->v)
         return -1;
@@ -485,10 +491,10 @@ seq_cmp(const void* a, const void* b)
 
 // Finisher for the correctness test
 static void
-vrfy_finisher(pcq *q, ctx** pp, int np, ctx** cc, int nc)
+vrfy_finisher(struct rte_ring *q, ctx** pp, int np, ctx** cc, int nc)
 {
-    u64v   allp;
-    u64v   allc;
+    struct u64v   allp;
+    struct u64v   allc;
 
     if (!rte_ring_empty(q)) {
         printf("Expected ringbuf to be empty; saw %d elements\n", rte_ring_count(q));
@@ -519,7 +525,7 @@ vrfy_finisher(pcq *q, ctx** pp, int np, ctx** cc, int nc)
 
     for (i = 0; i < nc; ++i) {
         ctx* cx = cc[i];
-        lat* ll;
+        struct lat  *ll = NULL;
 
         printf("#    C %d on cpu %d, %zd elem\n", i, cx->cpu, VECT_LEN(&cx->lv));
 
@@ -557,7 +563,7 @@ vrfy_finisher(pcq *q, ctx** pp, int np, ctx** cc, int nc)
 
 
 static void
-mt_test(test_desc* tt, int np, int nc)
+mt_test(struct test_desc* tt, int np, int nc)
 {
     int i, r;
     int nmax = sys_cpu_getavail();
@@ -570,7 +576,7 @@ mt_test(test_desc* tt, int np, int nc)
            "# QSIZ %d, %d elem/producer (total %d elem)\n",
             tt->name, nmax, np, nc, QSIZ, NITER, np * NITER);
 
-    pcq *q = mt_setup();
+    struct rte_ring *q = mt_setup();
 
     for (i = 0; i < np; ++i) {
 
@@ -653,13 +659,35 @@ basic_sp_test()
     } u;
 
 
-    q = rte_ring_create(4, 0);
+    const unsigned int count = 4;
+    const unsigned int flags = 0;// 参数 flags 默认值等于 0: 表示支持 MPMC “多生产者+多消费者”
+                                //#define RING_F_SP_ENQ 0x0001 /**< The default enqueue is "single-producer". */
+                                //#define RING_F_SC_DEQ 0x0002 /**< The default dequeue is "single-consumer". */
+                                //
+                                // RING_F_SP_ENQ: If this flag is set, the default behavior when
+                                //      using rte_ring_enqueue() or rte_ring_enqueue_bulk()
+                                //      is "single-producer". Otherwise, it is "multi-producers".
+                                // RING_F_SC_DEQ: If this flag is set, the default behavior when
+                                //      using rte_ring_dequeue() or rte_ring_dequeue_bulk()
 
+#define PRINTF(...) fprintf(stdout, __VA_ARGS__)
+
+#if !defined(DEBUG)
+#undef PRINTF
+#define PRINTF(...)
+#endif
+
+    PRINTF("调用 API 函数 rte_ring_create(%d, %d):\n", (int)count, (int)flags);
+    PRINTF("  参数 count=%d : 固定最大容量为 count-1=%d\n", (int)count, (int)count-1);
+    q = rte_ring_create(count, flags);
+
+    PRINTF("调用 API 函数 rte_ring_sp_enqueue() 插入若干测试节点\n");
     s = rte_ring_sp_enqueue(q, (void *)10); assert(s == 1);
     s = rte_ring_sp_enqueue(q, (void *)11); assert(s == 1);
     s = rte_ring_sp_enqueue(q, (void *)12); assert(s == 1);
 
     assert(rte_ring_count(q) == 3);
+    PRINTF("调用 API 函数 rte_ring_count() 返回值为 %d\n", (int)rte_ring_count(q));
 
     s = rte_ring_sp_enqueue(q, (void *)13); assert(s < 0);
     assert(rte_ring_full(q));
@@ -679,7 +707,7 @@ basic_sp_test()
 
     assert(rte_ring_empty(q));
     assert(!rte_ring_full(q));
-
+    PRINTF("调用 API 函数 rte_ring_destroy() 释放之前申请的资源\n");
     rte_ring_destroy(q);
 }
 
@@ -758,50 +786,49 @@ int main(int argc, char** argv)
     if (p == 0)
         p = half;
 
-    printf("【API基本测试1】\n"
-           "测试API函数 rte_ring_sp_enqueue() 的执行结果是否符合预期】\n");
+    printf("【测试1】API基本测试：检查“单生产者-多消费者”API函数执行结果是否符合预期\n"
+           "待测API函数如下:\n"
+           "  1. rte_ring_create()\n"
+           "  2. rte_ring_sp_enqueue()\n"
+           "  3. rte_ring_mc_dequeue()\n"
+           "  4. rte_ring_count()\n"
+           "  5. rte_ring_full()\n"
+           "  6. rte_ring_empty()\n"
+           "  7. rte_ring_destory()\n"
+           "开始执行测试用例 basic_sp_test() ...\n");
     basic_sp_test();
-    printf("测试通过！rte_ring_sp_enqueue()函数OK\n");
-    printf("API基本测试1结束，回到main()函数等待进行下一个测试...\n\n");
+    printf("API基本测试1结束，一切正常，回到main()函数等待进行下一个测试...\n\n");
 
-    printf("【API基本测试2】\n"
-           "测试API函数 rte_ring_mp_enqueue() 的执行结果是否符合预期】\n");
+    printf("【测试2】API基本测试：检查“多生产者-多消费者”API函数执行结果是否符合预期\n"
+           "待测API函数为:\n"
+           "  8. rte_ring_mp_enqueue()\n"
+           "开始执行测试用例 basic_mp_test() ...\n");
     basic_mp_test();
-    printf("测试通过！\n");
-    printf("API基本测试2结束，回到main()函数等待进行下一个测试...\n\n");
+    printf("API基本测试2结束，一切正常，回到main()函数等待进行下一个测试...\n\n");
 
-    printf("【测试3: 多线程读写自测试】\n");
-    test_desc vrfy = { .prod = vrfy_producer,
+    printf("【测试3】多线程读写自测试\n");
+    printf("测试环境: 检测当前操作系统逻辑CPU数量为 ncpu=%d\n", (int)ncpu);
+    printf("测试分配子线程总数=%d, 其中: 生产者 p=%d, 消费者 c=%d\n", p+c, p, c);
+    struct test_desc vrfy = {//测试3: 功能验证，对应的测试函数如下：
+                       .prod = vrfy_producer,
                        .cons = vrfy_consumer,
                        .fini = vrfy_finisher,
                        .name = "self-test",
                      };
 
     mt_test(&vrfy, p, c);
-    printf("测试通过！\n");
     printf("测试3结束，回到main()函数等待进行下一个测试...\n\n");
 
 
-#ifdef __OPTIMIZE__
-    printf("【测试4: performance性能测试】\n");
-#endif
-    // set by GNUmakefile when we do "release" builds with
-    // optimization on
-    test_desc perf = { .prod = perf_producer,
+    printf("【测试4】performance性能测试\n");
+    struct test_desc perf = {//测试4: performance性能测试，对应的测试函数如下：
+                       .prod = perf_producer,
                        .cons = perf_consumer,
                        .fini = perf_finisher,
                        .name = "perf-test",
                      };
-
-    USEARG(perf);
-#ifdef __OPTIMIZE__
     mt_test(&perf, p, c);
-#endif
-
-#ifdef __OPTIMIZE__
-    printf("测试通过！\n");
-    printf("测试4结束，回到main()函数\n");
-#endif
+    printf("测试4结束，回到main()函数\n\n");
 
     printf("恭喜，所有白盒自测试已经顺利通过！按回车键退出...\n");
     return 0;
