@@ -33,7 +33,7 @@
 #include <sys/time.h>
 #include <semaphore.h>
 #include "utils/cpu.h"   // 用到的函数: sys_cpu_getavail() 等
-#include "utils/utils.h" // 用到若干自定义函数
+#include "utils/utils.h" // 用到若干自定义函数: timenow() 和 sys_cpu_timestamp() 等
 #include "fast/vect.h"   // 用到的宏: VECT_TYPEDEF()
 #include "error.h"       // 用到若干自定义错误处理函数
 

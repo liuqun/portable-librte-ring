@@ -22,7 +22,9 @@ HEADERS += \
         fast/vect.h \
         rte_ring.h \
         utils/new.h \
-        utils/typeutils.h
+        utils/strutils.h \
+        utils/typeutils.h \
+        utils/utils.h
 
 unix {
     QMAKE_CFLAGS += -pthread
