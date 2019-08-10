@@ -758,9 +758,19 @@ int main(int argc, char** argv)
     if (p == 0)
         p = half;
 
+    printf("【API基本测试1】\n"
+           "测试API函数 rte_ring_sp_enqueue() 的执行结果是否符合预期】\n");
     basic_sp_test();
-    basic_mp_test();
+    printf("测试通过！rte_ring_sp_enqueue()函数OK\n");
+    printf("API基本测试1结束，回到main()函数等待进行下一个测试...\n\n");
 
+    printf("【API基本测试2】\n"
+           "测试API函数 rte_ring_mp_enqueue() 的执行结果是否符合预期】\n");
+    basic_mp_test();
+    printf("测试通过！\n");
+    printf("API基本测试2结束，回到main()函数等待进行下一个测试...\n\n");
+
+    printf("【测试3: 多线程读写自测试】\n");
     test_desc vrfy = { .prod = vrfy_producer,
                        .cons = vrfy_consumer,
                        .fini = vrfy_finisher,
@@ -768,7 +778,13 @@ int main(int argc, char** argv)
                      };
 
     mt_test(&vrfy, p, c);
+    printf("测试通过！\n");
+    printf("测试3结束，回到main()函数等待进行下一个测试...\n\n");
 
+
+#ifdef __OPTIMIZE__
+    printf("【测试4: performance性能测试】\n");
+#endif
     // set by GNUmakefile when we do "release" builds with
     // optimization on
     test_desc perf = { .prod = perf_producer,
@@ -782,6 +798,12 @@ int main(int argc, char** argv)
     mt_test(&perf, p, c);
 #endif
 
+#ifdef __OPTIMIZE__
+    printf("测试通过！\n");
+    printf("测试4结束，回到main()函数\n");
+#endif
+
+    printf("恭喜，所有白盒自测试已经顺利通过！按回车键退出...\n");
     return 0;
 }
 
