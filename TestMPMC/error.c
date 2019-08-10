@@ -143,16 +143,16 @@ warn(const char *fmt, ...)
 }
 
 /* C11 新增 _Noreturn 关键字，指示函数die("", ...)将立即退出当前进程，进程控制权不再返还给上层函数调用者 */
-#if __STDC_VERSION__ >= 201112L // C11标准新增 _Noreturn 关键字
-    #define MY_NORETURN_KEYWORD _Noreturn
+#if __STDC_VERSION__ >= 201112L // C11标准新增 _Noreturn 关键字和头文件<stdnoreturn.h>
+    #include <stdnoreturn.h>
 #elif __STDC_VERSION__ < 199901L && defined(__GNUC__)/* 使用 GCC 扩展 __attribute__((noreturn)) (当前编译器不支持 ISO C11 国际标准 _Noreturn 关键字) */
     /* 利用 GCC 提供的 __attribute__((noreturn)) 特殊选项代替 _Noreturn 关键字，指示函数die(...)将立即退出当前进程，进程控制权不再返还给上层函数调用者 */
-    #define MY_NORETURN_KEYWORD __attribute__((noreturn))
+    #define noreturn __attribute__((noreturn))
 #else
-    #define MY_NORETURN_KEYWORD
+    #define noreturn
 #endif
 
-_Noreturn void die(const char *fmt, ...)
+noreturn void die(const char *fmt, ...)
 {
     fflush(stdout);
     fflush(stderr);

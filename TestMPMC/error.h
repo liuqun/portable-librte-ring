@@ -19,6 +19,7 @@
 #ifndef ERROR_H_
 #define ERROR_H_
 
+#include <stdnoreturn.h>
 #include <stdarg.h>
 #include <errno.h>
 
@@ -51,11 +52,7 @@ extern const char * program_name;
 /*
  * Die with an error message.
  */
-#if __STDC_VERSION__ >= 201112L // C11标准新增 _Noreturn 关键字
-_Noreturn void die(const char *fmt, ...);
-#else
-__attribute__((noreturn)) void die(const char *fmt, ...);
-#endif
+noreturn void die(const char *fmt, ...);
 
 /*
  * Show a warning.
