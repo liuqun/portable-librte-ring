@@ -19,7 +19,9 @@ SOURCES += \
         rte_ring.c
 
 HEADERS += \
+        fast/vect.h \
         rte_ring.h \
+        utils/new.h \
         utils/typeutils.h
 
 unix {
