@@ -1,0 +1,3 @@
+[submodule "opensource/github.com/opencoff/portable-utils"]
+	path = opensource/github.com/opencoff/portable-utils
+	url = https://github.com/opencoff/portable-lib.git
