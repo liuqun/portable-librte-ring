@@ -43,9 +43,6 @@
 #define QSIZ        8*1024*1024
 #define NITER       8*1024*1024
 
-
-//typedef struct rte_ring pcq;
-
 // Latency tuple recorded by the consumer thread(s).
 // 性能测试(测试4和测试3)中记录消费者线程延迟长度时间戳的结构体
 struct lat
