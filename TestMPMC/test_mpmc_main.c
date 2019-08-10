@@ -62,8 +62,7 @@ struct latv {
 
 // Vect of u64（自定义数组类型2：以64位int整数为数组节点）
 // 语法宏 VECT_TYPEDEF(u64v, uint64_t); 完全展开后的结构体如下:
-// VECT_TYPEDEF(u64v, uint64_t);
-typedef struct u64v {
+struct u64v {
     uint64_t * array;
     size_t size;
     size_t capacity;
