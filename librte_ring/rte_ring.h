@@ -76,7 +76,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h> // 务必谨慎使用stdlib.h提供的calloc()和free()等标准库函数，C语言规范并不承诺标准内存分配函数支持多任务并发。
-                    // 我们的rte_ring_create()对库函数calloc()的调用被严格限制为：必须在任何子线程尚未启动之前分配固定长度的环形缓冲区。
+                    // 我们的rte_ring_create()对库函数calloc()的调用被严格限制为：必须在尚未启动任何子线程之前分配固定长度的环形缓冲区。
                     // 当任何生产者或消费者线程运行期间不允前缀为"rte_"的API函数动态申请或释放内存。
 
 /**
