@@ -245,7 +245,7 @@ static inline void
 __store_ring(struct rte_ring *r, uint_fast32_t head, void * const* obj, unsigned n)
 {
     unsigned i;
-    unsigned loops = n & 0x3;
+    unsigned loops = n & (~(unsigned) 0x03U);
     unsigned idx   = head & r->mask;
 
 
@@ -292,7 +292,7 @@ static inline void
 __load_ring(struct rte_ring *r, uint_fast32_t head, void **obj, unsigned n)
 {
     unsigned i;
-    unsigned loops = n & 0x3;
+    unsigned loops = n & (~(unsigned) 0x03U);
     unsigned idx   = head & r->mask;
 
 
