@@ -81,13 +81,13 @@ struct lat
 
 // Array of latency structs（自定义数组类型1：以struct lat结构体为数组节点）
 // 语法宏 VECT_TYPEDEF(latv, struct lat); 完全展开后的结构体如下:
-struct latv {
-    struct lat * array;
-    size_t size;
-    size_t capacity;
-};
+//struct latv {
+//    struct lat * array;
+//    size_t size;
+//    size_t capacity;
+//};
 //typedef struct latv latv;
-
+VECT_TYPEDEF(latv, struct lat);
 // Vect of u64（自定义数组类型2：以64位int整数为数组节点）
 // 语法宏 VECT_TYPEDEF(u64v, uint64_t); 完全展开后的结构体如下:
 struct u64v {
@@ -97,12 +97,16 @@ struct u64v {
 };
 //typedef struct u64v u64v;
 
+static
 sem_t                Ending;    // Used to signal thread completion
 
+static
 atomic_uint_fast32_t Seq __CACHELINE_ALIGNED;       // Used for verifying correctness
 
+static
 atomic_uint_fast32_t Done __CACHELINE_ALIGNED;      // Used to signal all consumers
 
+static
 atomic_uint_fast32_t Start __CACHELINE_ALIGNED;     // Used to tell all threads to "go"
 
 
@@ -155,6 +159,12 @@ struct test_desc
 typedef struct test_desc test_desc;
 
 
+#include "utils/new.h"
+// /* Macro to allocate a zero initialized item of type 'ty_' */
+//#define NEWZ(ty_)           (ty_ *)calloc(1, sizeof (ty_))
+
+// /* Macro to allocate a zero initialized array of type 'ty_' items */
+//#define NEWZA(ty_,n)        (ty_ *)calloc((n), sizeof (ty_))
 // Create a new context
 static ctx*
 newctx(struct rte_ring *q, size_t vsz, size_t ssz)
