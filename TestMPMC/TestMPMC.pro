@@ -2,6 +2,7 @@ TEMPLATE = app
 CONFIG += console
 CONFIG -= app_bundle
 CONFIG -= qt
+CONFIG += thread
 
 SOURCES += \
         error.c \
@@ -17,9 +18,6 @@ DEPENDPATH += $$PWD/../librte_ring
 unix: PRE_TARGETDEPS += $$OUT_PWD/../librte_ring/librte_ring.a
 
 unix {
-    QMAKE_CFLAGS += -pthread
-    QMAKE_CXXFLAGS += -pthread
-    QMAKE_LFLAGS += -pthread
     LIBS += -latomic
 }
 
