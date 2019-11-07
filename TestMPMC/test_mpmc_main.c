@@ -169,7 +169,8 @@ typedef struct test_desc test_desc;
 static ctx*
 newctx(struct rte_ring *q, size_t vsz, size_t ssz)
 {
-    ctx* c = NEWZ(ctx);
+    //ctx* c = NEWZ(struct ctx);
+    struct ctx *c = (struct ctx *)calloc(1, sizeof (struct ctx));
     assert(c);
 
     // Per CPU vars
